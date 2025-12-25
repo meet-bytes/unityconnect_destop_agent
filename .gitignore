@@ -1,0 +1,8 @@
+api-server/node_modules
+desktop-agent/node_modules
+desktop-agent/dist
+desktop-agent/build
+desktop-agent/storage
+desktop-agent/logs
+desktop-agent/package-lock.json
+desktop-agent/package.json

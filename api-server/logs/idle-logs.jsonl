@@ -1,0 +1,15 @@
+{"userName":"Meet Soni","idleStart":"2025-12-24T07:00:14.497Z","idleEnd":"2025-12-24T07:02:13.601Z","durationInSeconds":119,"platform":"darwin","receivedAt":"2025-12-24T07:02:13.845Z"}
+{"userName":"Meet","idleStart":"2025-12-24T07:02:32.817Z","idleEnd":"2025-12-24T07:03:17.856Z","durationInSeconds":45,"platform":"darwin","receivedAt":"2025-12-24T07:03:18.013Z"}
+{"userName":"Meet","idleStart":"2025-12-24T07:05:01.015Z","idleEnd":"2025-12-24T07:05:36.028Z","durationInSeconds":35,"platform":"darwin","receivedAt":"2025-12-24T07:05:36.181Z"}
+{"userName":"Meet","idleStart":"2025-12-24T07:09:44.421Z","idleEnd":"2025-12-24T07:12:03.584Z","durationInSeconds":139,"platform":"darwin","receivedAt":"2025-12-24T07:12:03.748Z"}
+{"userName":"soni","idleStart":"2025-12-24T07:14:51.606Z","idleEnd":"2025-12-24T07:16:33.731Z","durationInSeconds":102,"platform":"darwin","receivedAt":"2025-12-24T07:16:33.912Z"}
+{"userName":"soni","idleStart":"2025-12-24T07:16:41.751Z","idleEnd":"2025-12-24T07:17:21.795Z","durationInSeconds":40,"platform":"darwin","receivedAt":"2025-12-24T07:17:21.913Z"}
+{"userName":"MEET","idleStart":"2025-12-24T07:21:44.451Z","idleEnd":"2025-12-24T07:22:25.488Z","durationInSeconds":41,"platform":"darwin","receivedAt":"2025-12-24T07:22:25.680Z"}
+{"userName":"MEET","idleStart":"2025-12-24T07:23:20.929Z","idleEnd":"2025-12-24T07:40:21.347Z","durationInSeconds":1020,"platform":"darwin","receivedAt":"2025-12-24T07:40:21.453Z"}
+{"userName":"MEET","idleStart":"2025-12-24T07:40:19.362Z","idleEnd":"2025-12-24T07:59:14.728Z","durationInSeconds":1135,"platform":"darwin","receivedAt":"2025-12-24T07:59:15.602Z"}
+{"userName":"MEET","idleStart":"2025-12-24T07:59:14.775Z","idleEnd":"2025-12-24T07:59:23.782Z","durationInSeconds":9,"platform":"darwin","receivedAt":"2025-12-24T07:59:26.008Z"}
+{"userName":"MEET","idleStart":"2025-12-24T07:59:26.792Z","idleEnd":"2025-12-24T07:59:35.795Z","durationInSeconds":9,"platform":"darwin","receivedAt":"2025-12-24T07:59:35.931Z"}
+{"userName":"MEET","idleStart":"2025-12-24T07:59:45.817Z","idleEnd":"2025-12-24T08:00:11.841Z","durationInSeconds":26,"platform":"darwin","receivedAt":"2025-12-24T08:00:11.979Z"}
+{"userName":"MEET","idleStart":"2025-12-24T08:00:36.892Z","idleEnd":"2025-12-24T08:00:44.896Z","durationInSeconds":8,"platform":"darwin","receivedAt":"2025-12-24T08:00:45.056Z"}
+{"userName":"fefe","idleStart":"2025-12-24T08:09:55.454Z","idleEnd":"2025-12-24T08:10:09.466Z","durationInSeconds":14,"platform":"darwin","clientIp":"::1","receivedAt":"2025-12-24T08:10:09.672Z"}
+{"userName":"fefe","idleStart":"2025-12-24T08:10:07.472Z","idleEnd":"2025-12-24T08:10:33.494Z","durationInSeconds":26,"platform":"darwin","clientIp":"::1","receivedAt":"2025-12-24T08:10:33.606Z"}

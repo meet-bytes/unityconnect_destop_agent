@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UC - Desktop Agent (POC)</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="brand">
+          <img class="brand-logo" src="../assets/unitylogo.png" alt="Unity Communications" />
+        </div>
+        <div id="activityIndicator" class="activity-indicator stopped">
+          <span id="activityDot" class="activity-dot stopped"></span>
+          <span id="activityLabel">Stopped</span>
+        </div>
+      </header>
+
+      <main>
+        <label class="field">
+          <span>User name</span>
+          <input id="userName" type="text" placeholder="e.g. John Smith" />
+        </label>
+
+        <button id="startBtn" class="primary">Clock In / Start Agent</button>
+
+        <p id="helper" class="helper">
+          Agent runs in background. Idle tracking starts after 20 seconds of inactivity.
+        </p>
+
+        <section class="logs">
+          <div class="logs-header">
+            <div>
+              <div class="logs-title">Recent idle logs</div>
+              <div class="logs-subtitle">Latest 20 entries stored locally (auto-refresh)</div>
+            </div>
+            <div class="logs-actions">
+              <button id="refreshLogs" class="ghost">Refresh</button>
+              <button id="clearLogs" class="ghost">Clear logs</button>
+            </div>
+          </div>
+          <div id="logsList" class="logs-list">
+            <div class="log-row placeholder">No idle logs yet.</div>
+          </div>
+        </section>
+
+        <p class="notice">
+          Sending idle-state data only to https://unity-communication.bytestechnolab.net.
+           <br>
+           No OS-level operations are tracked for client safety.
+        </p>
+      </main>
+    </div>
+    <script src="./renderer.js"></script>
+  </body>
+</html>
+
