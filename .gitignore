@@ -5,4 +5,3 @@ desktop-agent/build
 desktop-agent/storage
 desktop-agent/logs
 desktop-agent/package-lock.json
-desktop-agent/package.json
