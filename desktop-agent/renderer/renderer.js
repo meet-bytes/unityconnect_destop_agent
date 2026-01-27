@@ -22,9 +22,10 @@ const setIdleState = (state) => {
 const setStatus = (status) => {
   running = Boolean(status?.running);
   startBtn.textContent = running ? 'Stop Agent' : 'Clock In / Start Agent';
+  const thresholdSeconds = Math.max(0, Math.round(Number(status?.thresholdSeconds) || 0));
   helper.textContent = running
-    ? 'Tracking idle time (after 20s inactivity). You can close this window; the agent stays on.'
-    : 'Agent runs in background. Idle tracking starts after 20 seconds of inactivity.';
+    ? `Tracking idle time (after ${thresholdSeconds}s inactivity). You can close this window; the agent stays on.`
+    : `Agent runs in background. Idle tracking starts after ${thresholdSeconds}s of inactivity.`;
   
   // Update activity indicator based on running state
   if (running) {

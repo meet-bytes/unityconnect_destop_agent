@@ -2,15 +2,16 @@ const { powerMonitor } = require('electron');
 const localStorage = require('./localStorage');
 const syncService = require('./syncService');
 
-const DEFAULT_THRESHOLD_SECONDS = 20;
+const { IDLE_THRESHOLD_SECONDS } = require('../config/idleTiming');
 const POLL_INTERVAL_MS = 1000;
 
 let pollHandle = null;
 let idleStart = null;
-let thresholdMs = DEFAULT_THRESHOLD_SECONDS * 1000;
+let thresholdMs = IDLE_THRESHOLD_SECONDS * 1000;
 let activeUser = null;
 let currentlyIdle = false;
 let onStateChangeCallback = null;
+let onTickCallback = null;
 
 // Track if idle detection is working (for Linux debugging)
 let idleDetectionWorking = null;
@@ -51,6 +52,15 @@ const checkIdle = () => {
 
   const now = Date.now();
   const isIdle = idleSeconds * 1000 >= thresholdMs;
+
+  // Emit tick updates (for overlays/UI)
+  if (onTickCallback) {
+    onTickCallback({
+      idleSeconds,
+      isIdle,
+      idleThresholdSeconds: thresholdMs / 1000,
+    });
+  }
 
   // Track state change for UI indicator
   if (isIdle !== currentlyIdle) {
@@ -95,7 +105,7 @@ const start = ({ userName, thresholdSeconds } = {}) => {
   thresholdMs =
     Number.isFinite(Number(thresholdSeconds)) && Number(thresholdSeconds) > 0
       ? Number(thresholdSeconds) * 1000
-      : DEFAULT_THRESHOLD_SECONDS * 1000;
+      : IDLE_THRESHOLD_SECONDS * 1000;
 
   pollHandle = setInterval(checkIdle, POLL_INTERVAL_MS);
   
@@ -125,9 +135,14 @@ const onStateChange = (callback) => {
   onStateChangeCallback = callback;
 };
 
+const onTick = (callback) => {
+  onTickCallback = callback;
+};
+
 module.exports = {
   start,
   stop,
   getStatus,
   onStateChange,
+  onTick,
 };

@@ -1,0 +1,94 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.overlay-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1;
+}
+
+.overlay-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  text-align: center;
+  color: #fff;
+  pointer-events: none;
+}
+
+.countdown-container {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: clamp(40px, 5vw, 72px);
+  background: rgba(16, 43, 58, 0.95);
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  width: min(90vw, 760px);
+}
+
+.countdown-container.hidden {
+  display: none !important;
+}
+
+.countdown-number {
+  font-size: clamp(120px, 14vw, 200px);
+  font-weight: 800;
+  color: #eab308;
+  line-height: 1;
+  text-shadow: 0 0 30px rgba(234, 179, 8, 0.6);
+  animation: pulse 1s ease-in-out infinite;
+  min-height: clamp(140px, 16vw, 220px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.countdown-message {
+  font-size: clamp(16px, 2.2vw, 24px);
+  color: #fff;
+  opacity: 0.85;
+  font-weight: 500;
+  line-height: 1.45;
+  max-width: 36ch;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}

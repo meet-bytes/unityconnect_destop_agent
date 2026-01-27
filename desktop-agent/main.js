@@ -1,14 +1,21 @@
-const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu, screen } = require('electron');
 const path = require('path');
 const AutoLaunch = require('auto-launch');
 const idleDetector = require('./services/idleDetector');
 const syncService = require('./services/syncService');
 const { ensureStore } = require('./services/localStorage');
+const { IDLE_THRESHOLD_SECONDS, WARNING_COUNTDOWN_SECONDS } = require('./config/idleTiming');
 
 const SERVER_ENDPOINT = 'https://unity-communication.bytestechnolab.net/api/idle-logs';
 
 let mainWindow;
 let tray;
+let overlayWindow;
+
+// Overlay state
+let overlayPhase = 'hidden'; // 'hidden' | 'countdown'
+let pendingOverlayEvent = null; // { channel, payload }
+let lastCountdownPayload = null; // { countdown: number }
 
 const iconPath = path.join(__dirname, 'assets', 'app_icon.png');
 
@@ -121,6 +128,101 @@ const createWindow = () => {
   });
 };
 
+const ensureOverlayWindow = () => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) return overlayWindow;
+
+  const icon = nativeImage.createFromPath(iconPath);
+  const display = screen.getPrimaryDisplay();
+  const bounds = display?.bounds || { x: 0, y: 0, width: 1280, height: 720 };
+  overlayWindow = new BrowserWindow({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    fullscreen: true,
+    fullscreenable: true,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    closable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    focusable: false,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    icon,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-overlay.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  overlayWindow.setMenuBarVisibility(false);
+  overlayWindow.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
+
+  overlayWindow.webContents.once('did-finish-load', () => {
+    if (!overlayWindow || overlayWindow.isDestroyed()) return;
+    if (pendingOverlayEvent) {
+      const { channel, payload } = pendingOverlayEvent;
+      pendingOverlayEvent = null;
+      overlayWindow.webContents.send(channel, payload);
+    }
+  });
+
+  overlayWindow.once('ready-to-show', () => {
+    if (!overlayWindow || overlayWindow.isDestroyed()) return;
+    // Ensure full screen/bounds (some Linux WMs ignore initial fullscreen for transparent windows)
+    overlayWindow.setBounds(bounds);
+    overlayWindow.setFullScreen(true);
+
+    // Make overlay click-through (user activity still resets system idle time)
+    overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+    // Stay above full-screen apps where supported
+    overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+    if (overlayWindow.setVisibleOnAllWorkspaces) {
+      overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    }
+  });
+
+  overlayWindow.on('closed', () => {
+    overlayWindow = null;
+  });
+
+  return overlayWindow;
+};
+
+const sendOverlay = (channel, payload) => {
+  const win = ensureOverlayWindow();
+  if (!win || win.isDestroyed()) return;
+
+  if (win.webContents.isLoadingMainFrame()) {
+    pendingOverlayEvent = { channel, payload };
+    return;
+  }
+  win.webContents.send(channel, payload);
+};
+
+const hideOverlay = () => {
+  overlayPhase = 'hidden';
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.hide();
+  }
+};
+
+const showCountdownOverlay = (countdownSeconds) => {
+  const win = ensureOverlayWindow();
+  if (!win || win.isDestroyed()) return;
+  overlayPhase = 'countdown';
+  if (!win.isVisible()) win.showInactive();
+  lastCountdownPayload = { countdown: countdownSeconds };
+  sendOverlay('overlay:countdown', lastCountdownPayload);
+};
+
 const broadcastStatus = () => {
   const status = idleDetector.getStatus();
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -137,6 +239,48 @@ const broadcastIdleState = (state) => {
 
 // Set up idle state change listener
 idleDetector.onStateChange(broadcastIdleState);
+
+// Drive full-screen overlay from per-second idle ticks
+idleDetector.onTick((tick) => {
+  const { idleSeconds } = tick || {};
+  const idleSec = Number(idleSeconds) || 0;
+  const idleAt = Math.max(1, Number(IDLE_THRESHOLD_SECONDS) || 20);
+  const warnCountdown = Math.max(1, Number(WARNING_COUNTDOWN_SECONDS) || 10);
+  const warnAt = Math.max(0, idleAt - warnCountdown);
+
+  // Only show overlay while agent is running
+  const status = idleDetector.getStatus();
+  if (!status.running) {
+    if (overlayPhase !== 'hidden') hideOverlay();
+    return;
+  }
+
+  // User is active (or below warning threshold) => close overlay immediately
+  if (idleSec < warnAt) {
+    if (overlayPhase !== 'hidden') hideOverlay();
+    return;
+  }
+
+  // Warning phase: show countdown (WARNING_COUNTDOWN_SECONDS -> 0)
+  if (idleSec >= warnAt && idleSec < idleAt) {
+    const countdown = Math.max(0, Math.ceil(idleAt - idleSec));
+    showCountdownOverlay(countdown);
+    return;
+  }
+
+  // After countdown hits 0 (total idle >= 20s) -> auto-close overlay
+  if (overlayPhase !== 'hidden') hideOverlay();
+});
+
+// Overlay renderer handshake: resend the latest countdown when it's ready
+ipcMain.on('overlay:ready', (event) => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  if (event.sender !== overlayWindow.webContents) return;
+
+  if (overlayPhase === 'countdown' && lastCountdownPayload) {
+    sendOverlay('overlay:countdown', lastCountdownPayload);
+  }
+});
 
 app.whenReady().then(async () => {
   ensureStore();
@@ -174,7 +318,7 @@ ipcMain.handle('agent:start', async (_event, payload = {}) => {
 
   idleDetector.start({
     userName: userName.trim(),
-    thresholdSeconds: 20, // Fixed 20-second threshold
+    thresholdSeconds: IDLE_THRESHOLD_SECONDS,
   });
   broadcastStatus();
   return idleDetector.getStatus();
@@ -182,6 +326,7 @@ ipcMain.handle('agent:start', async (_event, payload = {}) => {
 
 ipcMain.handle('agent:stop', async () => {
   idleDetector.stop();
+  hideOverlay();
   broadcastStatus();
   return idleDetector.getStatus();
 });
@@ -202,6 +347,7 @@ ipcMain.handle('agent:clearLogs', async () => {
 app.on('before-quit', () => {
   app.isQuitting = true;
   idleDetector.stop();
+  hideOverlay();
   syncService.stop();
 });
 
