@@ -4,104 +4,107 @@
     "description": "Electron idle tracking agent POC",
     "main": "main.js",
     "author": {
-      "name": "Bytes Technolab",
-      "email": "info@bytestechnolab.com"
+        "name": "Bytes Technolab",
+        "email": "info@bytestechnolab.com"
     },
     "homepage": "https://unitycommunications.com",
     "scripts": {
-      "electron:dev": "electron .",
-      "build": "electron-builder",
-      "dist": "electron-builder",
-      "dist:mac": "electron-builder --mac",
-      "dist:win": "electron-builder --win",
-      "dist:linux": "electron-builder --linux",
-      "dist:all": "electron-builder --mac --win --linux"
+        "generate-tray-icons": "node scripts/generate-tray-icons.js",
+        "electron:dev": "npm run generate-tray-icons && electron .",
+        "prebuild": "npm run generate-tray-icons",
+        "build": "electron-builder",
+        "dist": "electron-builder",
+        "dist:mac": "electron-builder --mac",
+        "dist:win": "electron-builder --win",
+        "dist:linux": "electron-builder --linux",
+        "dist:all": "electron-builder --mac --win --linux"
     },
     "dependencies": {
-      "auto-launch": "^5.0.6",
-      "node-fetch": "^2.7.0",
-      "ps-list": "^8.1.1"
+        "auto-launch": "^5.0.6",
+        "node-fetch": "^2.7.0",
+        "ps-list": "^8.1.1"
     },
     "optionalDependencies": {
-      "iohook": "^0.9.3"
+        "iohook": "^0.9.3"
     },
     "devDependencies": {
-      "electron": "^28.3.1",
-      "electron-builder": "^24.13.3",
-      "electron-packager": "^17.1.1"
+        "electron": "^28.3.1",
+        "electron-builder": "^24.13.3",
+        "electron-packager": "^17.1.1",
+        "sharp": "^0.34.5"
     },
     "build": {
-      "appId": "com.unitycommunications.idleagent",
-      "productName": "Unity Communications Agent",
-      "files": [
-        "**/*",
-        "!dist/**"
-      ],
-      "asar": true,
-      "directories": {
-        "output": "dist"
-      },
-      "mac": {
-        "target": [
-          {
-            "target": "dmg",
-            "arch": [
-              "x64",
-              "arm64"
-            ]
-          }
+        "appId": "com.unitycommunications.idleagent",
+        "productName": "Unity Communications Agent",
+        "files": [
+            "**/*",
+            "!dist/**"
         ],
-        "icon": "assets/app_icon.png",
-        "category": "public.app-category.productivity"
-      },
-      "dmg": {
-        "artifactName": "Unity-Communications-Agent-${version}-mac-${arch}.dmg"
-      },
-      "win": {
-        "target": [
-          {
-            "target": "nsis",
-            "arch": [
-              "x64"
-            ]
-          },
-          {
-            "target": "portable",
-            "arch": [
-              "x64"
-            ]
-          }
-        ],
-        "icon": "assets/app_icon.png"
-      },
-      "nsis": {
-        "oneClick": false,
-        "perMachine": false,
-        "allowToChangeInstallationDirectory": true,
-        "artifactName": "Unity-Communications-Agent-Setup-${version}.exe"
-      },
-      "portable": {
-        "artifactName": "Unity-Communications-Agent-${version}-portable.exe"
-      },
-      "linux": {
-        "target": [
-          {
-            "target": "AppImage",
-            "arch": [
-              "x64"
-            ]
-          },
-          {
-            "target": "deb",
-            "arch": [
-              "x64"
-            ]
-          }
-        ],
-        "icon": "assets/app_icon.png",
-        "category": "Utility",
-        "maintainer": "Bytes Technolab <meet.soni@bytestechnolab.com>",
-        "artifactName": "Unity-Communications-Agent-${version}.${ext}"
-      }
+        "asar": true,
+        "directories": {
+            "output": "dist"
+        },
+        "mac": {
+            "target": [
+                {
+                    "target": "dmg",
+                    "arch": [
+                        "x64",
+                        "arm64"
+                    ]
+                }
+            ],
+            "icon": "assets/app-logo.png",
+            "category": "public.app-category.productivity"
+        },
+        "dmg": {
+            "artifactName": "Unity-Communications-Agent-${version}-mac-${arch}.dmg"
+        },
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                },
+                {
+                    "target": "portable",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "icon": "assets/app-logo.png"
+        },
+        "nsis": {
+            "oneClick": false,
+            "perMachine": false,
+            "allowToChangeInstallationDirectory": true,
+            "artifactName": "Unity-Communications-Agent-Setup-${version}.exe"
+        },
+        "portable": {
+            "artifactName": "Unity-Communications-Agent-${version}-portable.exe"
+        },
+        "linux": {
+            "target": [
+                {
+                    "target": "AppImage",
+                    "arch": [
+                        "x64"
+                    ]
+                },
+                {
+                    "target": "deb",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "icon": "assets/app-logo.png",
+            "category": "Utility",
+            "maintainer": "Bytes Technolab <meet.soni@bytestechnolab.com>",
+            "artifactName": "Unity-Communications-Agent-${version}.${ext}"
+        }
     }
-  }
+}

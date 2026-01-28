@@ -1,28 +1,45 @@
-const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu, screen } = require('electron');
-const path = require('path');
-const AutoLaunch = require('auto-launch');
-const idleDetector = require('./services/idleDetector');
-const syncService = require('./services/syncService');
-const { ensureStore } = require('./services/localStorage');
-const { IDLE_THRESHOLD_SECONDS, WARNING_COUNTDOWN_SECONDS } = require('./config/idleTiming');
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  nativeImage,
+  Tray,
+  Menu,
+  screen,
+} = require("electron");
+const path = require("path");
+const AutoLaunch = require("auto-launch");
+const idleDetector = require("./services/idleDetector");
+const syncService = require("./services/syncService");
+const { ensureStore } = require("./services/localStorage");
+const {
+  IDLE_THRESHOLD_SECONDS,
+  WARNING_COUNTDOWN_SECONDS,
+} = require("./config/idleTiming");
 
-const SERVER_ENDPOINT = 'https://unity-communication.bytestechnolab.net/api/idle-logs';
+const SERVER_ENDPOINT =
+  "https://unity-communication.bytestechnolab.net/api/idle-logs";
 
 let mainWindow;
 let tray;
 let overlayWindow;
 
 // Overlay state
-let overlayPhase = 'hidden'; // 'hidden' | 'countdown'
+let overlayPhase = "hidden"; // 'hidden' | 'countdown'
 let pendingOverlayEvent = null; // { channel, payload }
 let lastCountdownPayload = null; // { countdown: number }
 
-const iconPath = path.join(__dirname, 'assets', 'app_icon.png');
+const iconPath = path.join(__dirname, "assets", "app-logo.png");
+const trayIconPaths = {
+  active: path.join(__dirname, "assets", "tray-active.png"),
+  idle: path.join(__dirname, "assets", "tray-idle.png"),
+  stopped: path.join(__dirname, "assets", "tray-stopped.png"),
+};
 
 // Auto-launch configuration (starts app on login)
 const autoLauncher = new AutoLaunch({
-  name: 'Unity Communications Agent',
-  path: app.getPath('exe'),
+  name: "Unity Communications Agent",
+  path: app.getPath("exe"),
   isHidden: true, // Start minimized to tray
 });
 
@@ -32,24 +49,45 @@ const enableAutoLaunch = async () => {
     const isEnabled = await autoLauncher.isEnabled();
     if (!isEnabled) {
       await autoLauncher.enable();
-      console.log('Auto-launch enabled');
+      console.log("Auto-launch enabled");
     }
   } catch (err) {
-    console.error('Failed to enable auto-launch:', err);
+    console.error("Failed to enable auto-launch:", err);
   }
 };
 
-// Create system tray icon with menu
-const createTray = () => {
-  const icon = nativeImage.createFromPath(iconPath);
-  // Resize for tray (16x16 on most platforms, 22x22 on some Linux)
-  const trayIcon = icon.resize({ width: 16, height: 16 });
+function getTrayStatus() {
+  const s = idleDetector.getStatus();
+  if (!s?.running) return "stopped";
+  return s.isIdle ? "idle" : "active";
+}
 
-  tray = new Tray(trayIcon);
+function getTrayStatusLabel() {
+  const t = getTrayStatus();
+  return t === "stopped" ? "Stopped" : t === "idle" ? "Idle" : "Active";
+}
+
+function updateTrayIcon() {
+  if (!tray || tray.isDestroyed()) return;
+  const status = getTrayStatus();
+  const iconPathForStatus = trayIconPaths[status] || trayIconPaths.stopped;
+  const img = nativeImage.createFromPath(iconPathForStatus);
+  if (!img.isEmpty()) {
+    tray.setImage(img);
+  }
+  tray.setToolTip(`Unity Communications Agent • ${getTrayStatusLabel()}`);
+}
+
+function createTray() {
+  let img = nativeImage.createFromPath(trayIconPaths.stopped);
+  if (img.isEmpty()) {
+    img = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+  }
+  tray = new Tray(img);
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Open',
+      label: "Open",
       click: () => {
         if (mainWindow) {
           mainWindow.show();
@@ -60,11 +98,11 @@ const createTray = () => {
       },
     },
     {
-      label: 'Status',
-      sublabel: 'Check agent status',
+      label: "Status",
+      sublabel: "Check agent status",
       click: () => {
         const status = idleDetector.getStatus();
-        const state = status.running ? 'Running' : 'Stopped';
+        const state = status.running ? "Running" : "Stopped";
         console.log(`Agent status: ${state}`);
         if (mainWindow) {
           mainWindow.show();
@@ -72,9 +110,9 @@ const createTray = () => {
         }
       },
     },
-    { type: 'separator' },
+    { type: "separator" },
     {
-      label: 'Quit',
+      label: "Quit",
       click: () => {
         app.isQuitting = true;
         app.quit();
@@ -82,11 +120,10 @@ const createTray = () => {
     },
   ]);
 
-  tray.setToolTip('Unity Communications Agent');
   tray.setContextMenu(contextMenu);
+  updateTrayIcon();
 
-  // Click on tray icon opens the window
-  tray.on('click', () => {
+  tray.on("click", () => {
     if (mainWindow) {
       mainWindow.show();
       mainWindow.focus();
@@ -103,27 +140,27 @@ const createWindow = () => {
     width: 620,
     height: 820,
     resizable: false,
-    title: 'Unity Communications',
+    title: "Unity Communications",
     icon,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
   mainWindow.setMenuBarVisibility(false);
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 
   // Hide window instead of closing (keeps agent running in background)
-  mainWindow.on('close', (event) => {
+  mainWindow.on("close", (event) => {
     if (!app.isQuitting) {
       event.preventDefault();
       mainWindow.hide();
     }
   });
 
-  mainWindow.on('closed', () => {
+  mainWindow.on("closed", () => {
     mainWindow = null;
   });
 };
@@ -152,20 +189,20 @@ const ensureOverlayWindow = () => {
     skipTaskbar: true,
     focusable: false,
     hasShadow: false,
-    backgroundColor: '#00000000',
+    backgroundColor: "#00000000",
     icon,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload-overlay.js'),
+      preload: path.join(__dirname, "preload-overlay.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
   overlayWindow.setMenuBarVisibility(false);
-  overlayWindow.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
+  overlayWindow.loadFile(path.join(__dirname, "renderer", "overlay.html"));
 
-  overlayWindow.webContents.once('did-finish-load', () => {
+  overlayWindow.webContents.once("did-finish-load", () => {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
     if (pendingOverlayEvent) {
       const { channel, payload } = pendingOverlayEvent;
@@ -174,7 +211,7 @@ const ensureOverlayWindow = () => {
     }
   });
 
-  overlayWindow.once('ready-to-show', () => {
+  overlayWindow.once("ready-to-show", () => {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
     // Ensure full screen/bounds (some Linux WMs ignore initial fullscreen for transparent windows)
     overlayWindow.setBounds(bounds);
@@ -183,13 +220,15 @@ const ensureOverlayWindow = () => {
     // Make overlay click-through (user activity still resets system idle time)
     overlayWindow.setIgnoreMouseEvents(true, { forward: true });
     // Stay above full-screen apps where supported
-    overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+    overlayWindow.setAlwaysOnTop(true, "screen-saver");
     if (overlayWindow.setVisibleOnAllWorkspaces) {
-      overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      overlayWindow.setVisibleOnAllWorkspaces(true, {
+        visibleOnFullScreen: true,
+      });
     }
   });
 
-  overlayWindow.on('closed', () => {
+  overlayWindow.on("closed", () => {
     overlayWindow = null;
   });
 
@@ -208,7 +247,7 @@ const sendOverlay = (channel, payload) => {
 };
 
 const hideOverlay = () => {
-  overlayPhase = 'hidden';
+  overlayPhase = "hidden";
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.hide();
   }
@@ -217,24 +256,25 @@ const hideOverlay = () => {
 const showCountdownOverlay = (countdownSeconds) => {
   const win = ensureOverlayWindow();
   if (!win || win.isDestroyed()) return;
-  overlayPhase = 'countdown';
+  overlayPhase = "countdown";
   if (!win.isVisible()) win.showInactive();
   lastCountdownPayload = { countdown: countdownSeconds };
-  sendOverlay('overlay:countdown', lastCountdownPayload);
+  sendOverlay("overlay:countdown", lastCountdownPayload);
 };
 
 const broadcastStatus = () => {
   const status = idleDetector.getStatus();
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('agent:status', status);
+    mainWindow.webContents.send("agent:status", status);
   }
 };
 
 // Broadcast idle state changes to renderer
 const broadcastIdleState = (state) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('agent:idleState', state);
+    mainWindow.webContents.send("agent:idleState", state);
   }
+  updateTrayIcon();
 };
 
 // Set up idle state change listener
@@ -251,13 +291,13 @@ idleDetector.onTick((tick) => {
   // Only show overlay while agent is running
   const status = idleDetector.getStatus();
   if (!status.running) {
-    if (overlayPhase !== 'hidden') hideOverlay();
+    if (overlayPhase !== "hidden") hideOverlay();
     return;
   }
 
   // User is active (or below warning threshold) => close overlay immediately
   if (idleSec < warnAt) {
-    if (overlayPhase !== 'hidden') hideOverlay();
+    if (overlayPhase !== "hidden") hideOverlay();
     return;
   }
 
@@ -269,16 +309,16 @@ idleDetector.onTick((tick) => {
   }
 
   // After countdown hits 0 (total idle >= 20s) -> auto-close overlay
-  if (overlayPhase !== 'hidden') hideOverlay();
+  if (overlayPhase !== "hidden") hideOverlay();
 });
 
 // Overlay renderer handshake: resend the latest countdown when it's ready
-ipcMain.on('overlay:ready', (event) => {
+ipcMain.on("overlay:ready", (event) => {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
   if (event.sender !== overlayWindow.webContents) return;
 
-  if (overlayPhase === 'countdown' && lastCountdownPayload) {
-    sendOverlay('overlay:countdown', lastCountdownPayload);
+  if (overlayPhase === "countdown" && lastCountdownPayload) {
+    sendOverlay("overlay:countdown", lastCountdownPayload);
   }
 });
 
@@ -287,7 +327,7 @@ app.whenReady().then(async () => {
   syncService.init({ endpoint: SERVER_ENDPOINT });
 
   // Set dock icon on macOS
-  if (process.platform === 'darwin' && iconPath) {
+  if (process.platform === "darwin" && iconPath) {
     const icon = nativeImage.createFromPath(iconPath);
     app.dock.setIcon(icon);
   }
@@ -301,7 +341,7 @@ app.whenReady().then(async () => {
   // Enable auto-launch on login
   await enableAutoLaunch();
 
-  app.on('activate', () => {
+  app.on("activate", () => {
     if (!mainWindow) {
       createWindow();
       return;
@@ -310,10 +350,10 @@ app.whenReady().then(async () => {
   });
 });
 
-ipcMain.handle('agent:start', async (_event, payload = {}) => {
+ipcMain.handle("agent:start", async (_event, payload = {}) => {
   const { userName } = payload;
   if (!userName || !userName.trim()) {
-    throw new Error('User name is required to start the agent.');
+    throw new Error("User name is required to start the agent.");
   }
 
   idleDetector.start({
@@ -321,30 +361,32 @@ ipcMain.handle('agent:start', async (_event, payload = {}) => {
     thresholdSeconds: IDLE_THRESHOLD_SECONDS,
   });
   broadcastStatus();
+  updateTrayIcon();
   return idleDetector.getStatus();
 });
 
-ipcMain.handle('agent:stop', async () => {
+ipcMain.handle("agent:stop", async () => {
   idleDetector.stop();
   hideOverlay();
   broadcastStatus();
+  updateTrayIcon();
   return idleDetector.getStatus();
 });
 
-ipcMain.handle('agent:status', async () => idleDetector.getStatus());
+ipcMain.handle("agent:status", async () => idleDetector.getStatus());
 
-ipcMain.handle('agent:logs', async () => {
-  const { archive, queue } = require('./services/localStorage').readStore();
+ipcMain.handle("agent:logs", async () => {
+  const { archive, queue } = require("./services/localStorage").readStore();
   return { archive, queue };
 });
 
-ipcMain.handle('agent:clearLogs', async () => {
-  const storage = require('./services/localStorage');
+ipcMain.handle("agent:clearLogs", async () => {
+  const storage = require("./services/localStorage");
   storage.clearAll();
   return { ok: true };
 });
 
-app.on('before-quit', () => {
+app.on("before-quit", () => {
   app.isQuitting = true;
   idleDetector.stop();
   hideOverlay();
@@ -352,7 +394,7 @@ app.on('before-quit', () => {
 });
 
 // Keep app running in background on all platforms (tray stays active)
-app.on('window-all-closed', () => {
+app.on("window-all-closed", () => {
   // Do nothing - app stays running via tray
   // Only quit when user clicks "Quit" from tray menu
 });
