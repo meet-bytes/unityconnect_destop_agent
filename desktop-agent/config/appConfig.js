@@ -5,21 +5,13 @@
 // API Endpoints
 const SERVER_ENDPOINT =
   "https://unity-communication.bytestechnolab.net/api/idle-logs";
-const LOGIN_BASE_URL = "http://192.168.10.20:3000/login";
+// Login page opened by desktop agent; frontend uses redirect_uri=unityagent to redirect back
+const LOGIN_URL =
+  "http://192.168.10.20:3000/login?redirect_uri=unityagent";
 
 // Protocol Configuration
 const PROTOCOL_SCHEME = "unityagent";
 const PROTOCOL_AUTH_PATH = "auth";
-
-/**
- * Builds the login URL for the browser.
- * Note: Frontend handles redirect to protocol URL after login (no redirect_uri needed).
- */
-const buildLoginURL = () => {
-  return LOGIN_BASE_URL;
-};
-
-const LOGIN_URL = buildLoginURL();
 
 // App Information
 const APP_ID = "com.unitycommunications.idleagent";
@@ -46,9 +38,7 @@ const WINDOW_HEIGHT = 820;
 module.exports = {
   // API Endpoints
   SERVER_ENDPOINT,
-  LOGIN_BASE_URL,
   LOGIN_URL,
-  buildLoginURL,
 
   // Protocol
   PROTOCOL_SCHEME,

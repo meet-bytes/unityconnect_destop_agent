@@ -1,109 +1,137 @@
 # Protocol Handler Troubleshooting
 
-## Issue: "Launched external handler" but app doesn't receive callback
+When the browser shows "Launched external handler for 'unityagent://auth?token=...'" but the desktop app doesn't respond, use this guide.
 
-If you see "Launched external handler for 'unityagent://auth?token=...'" in the browser console but the desktop app doesn't respond, follow these steps:
+## How it works
 
-### Step 1: Verify Protocol Handler Registration
+1. **Browser** redirects to `unityagent://auth?token=...&refreshToken=...`.
+2. **OS** invokes the protocol handler: `scripts/unityagent-handler.sh` with the URL.
+3. **Wrapper script** (`unityagent-handler.sh`):
+   - Writes the URL to `~/.config/desktop-agent/protocol-queue.json` (fallback).
+   - Launches Electron with the URL (so `second-instance` can fire if the app is already running).
+4. **Desktop app** receives the URL either via:
+   - **second-instance** (Windows/Linux when it fires), or
+   - **Queue file fallback**: app polls `protocol-queue.json` every 500 ms (used when `second-instance` doesn’t fire on Linux).
 
-Run the registration script:
+---
+
+## Step 1: Verify protocol handler registration
+
+From the `desktop-agent` directory:
+
 ```bash
 cd desktop-agent
 ./scripts/register-protocol.sh
 ```
 
-Verify it's registered:
+Check that the handler is registered:
+
 ```bash
 xdg-mime query default x-scheme-handler/unityagent
 ```
-Should output: `unityagent-handler.desktop`
 
-### Step 2: Check if App is Running
+Expected: `unityagent-handler.desktop`
 
-**Important:** The app must be running when you click login, OR the protocol handler should launch it automatically.
+---
 
-**Option A: Keep app running**
-- Start the app first: `npm run electron:dev`
-- Then click Login in the browser
-- The app should receive the callback via `second-instance` event
+## Step 2: Ensure the app is running
 
-**Option B: Let protocol handler launch app**
-- Don't start the app manually
-- Click Login in browser
-- Protocol handler should launch the app with the URL
-- Check console logs for `[protocol] App ready, checking argv:`
+The app **must be running** when the browser redirects (tray or window).
 
-### Step 3: Check Console Logs
+- Start the app: `npm run electron:dev`
+- Then complete login in the browser and allow the redirect.
+- If **second-instance** doesn’t fire (common on Linux), the **queue file fallback** still delivers the URL as long as the app is running.
 
-When you click login and the browser redirects, check the Electron app console for:
+---
 
-```
-[protocol] Received URL: unityagent://auth?token=...
-[protocol] Second instance event, commandLine: [...]
-[protocol] Extracted URL from commandLine: ...
-[protocol] App ready, checking argv: [...]
-[auth] Token stored successfully
-```
+## Step 3: Check desktop entry
 
-### Step 4: Test Protocol Handler Directly
+The handler uses a **wrapper script**, not Electron directly:
 
-Test if the protocol handler works:
-```bash
-xdg-open 'unityagent://auth?token=test123&refreshToken=test456'
-```
-
-The app should:
-- Launch (if not running) OR focus (if running)
-- Show `[protocol] Received URL:` in console
-- Store the token
-
-### Step 5: Check Desktop Entry
-
-Verify the desktop entry exists and is correct:
 ```bash
 cat ~/.local/share/applications/unityagent-handler.desktop
 ```
 
-Should show:
+Expected:
+
 ```
-Exec="/path/to/node_modules/.bin/electron" "/path/to/desktop-agent/main.js" %u
+Exec="/path/to/desktop-agent/scripts/unityagent-handler.sh" %u
 ```
 
-### Step 6: Common Issues
+- `%u` must be present (replaced with the protocol URL).
+- The script path must point to your project’s `scripts/unityagent-handler.sh`.
 
-**Issue:** App launches but doesn't receive URL
-- **Fix:** Check if `main.js` is the correct entry point in desktop entry
-- **Fix:** Ensure `%u` is at the end of Exec line
+Make the desktop file and script executable if needed:
 
-**Issue:** App doesn't launch at all
-- **Fix:** Check Electron path in desktop entry is correct
-- **Fix:** Run `chmod +x ~/.local/share/applications/unityagent-handler.desktop`
-- **Fix:** Run `update-desktop-database ~/.local/share/applications`
+```bash
+chmod +x ~/.local/share/applications/unityagent-handler.desktop
+chmod +x /path/to/desktop-agent/scripts/unityagent-handler.sh
+```
 
-**Issue:** Browser shows "No handler" or "Choose application"
-- **Fix:** Re-run `./scripts/register-protocol.sh`
-- **Fix:** Log out and log back in (to refresh desktop database)
+---
 
-**Issue:** App is running but second-instance doesn't fire
-- **Fix:** Ensure single-instance lock is working (check console for "Single instance lock acquired")
-- **Fix:** Check if URL is in commandLine array (see console logs)
+## Step 4: Test the protocol handler directly
 
-### Step 7: Manual Test
+With the app **already running**:
 
-1. **Start app:** `npm run electron:dev`
-2. **In another terminal:** `xdg-open 'unityagent://auth?token=test123&refreshToken=test456'`
-3. **Check app console** for `[protocol] Received URL:`
-4. **If working:** You should see token stored and UI update
-5. **If not working:** Check which step failed (launch, URL extraction, token parsing)
+```bash
+xdg-open 'unityagent://auth?token=test123&refreshToken=test456'
+```
 
-### Debug Mode
+Expected:
 
-To see all protocol-related logs, check the Electron console output. All protocol handling logs are prefixed with `[protocol]` or `[auth]`.
+- App window comes to front.
+- Token is handled (you may see login/agent UI).
+- No extra errors in the Electron console.
 
-### Still Not Working?
+If the app is **not** running, the same command should start the app with the URL (first-launch flow).
 
-1. Check browser console for any errors
-2. Check Electron app console for protocol logs
-3. Verify desktop entry permissions: `ls -la ~/.local/share/applications/unityagent-handler.desktop`
-4. Try restarting your desktop environment (logout/login)
-5. Check if another app is handling `unityagent://` protocol
+---
+
+## Step 5: Queue file fallback (Linux)
+
+On Linux, `second-instance` often doesn’t fire. The app uses a **file-based fallback**:
+
+1. Wrapper script writes the URL to:  
+   `~/.config/desktop-agent/protocol-queue.json`
+2. The running app polls this file every 500 ms and processes any URL found.
+3. The file is deleted after reading.
+
+If redirect “does nothing” but the app is running:
+
+- Confirm the wrapper is the one invoked (desktop entry `Exec` points to `unityagent-handler.sh`).
+- Optionally check that the queue file appears right after the browser redirect:  
+  `ls -la ~/.config/desktop-agent/protocol-queue.json`  
+  (It may disappear quickly once the app reads it.)
+
+---
+
+## Step 6: Common issues and fixes
+
+| Issue | What to check | Fix |
+|-------|----------------|-----|
+| App doesn’t launch at all | Desktop entry `Exec` path, script and desktop file executable | Fix paths in `register-protocol.sh`, run it again, `chmod +x` on the script and `.desktop` file |
+| Browser: “No handler” or “Choose application” | Handler not/default not set | Run `./scripts/register-protocol.sh`; log out and back in if needed |
+| “Launched external handler” but app does nothing | App not running; or wrapper not writing queue file | Start app first (`npm run electron:dev`); confirm desktop entry uses `unityagent-handler.sh` |
+| App starts but doesn’t receive URL (first launch) | URL in `argv` / queue file | Ensure `%u` is in desktop entry `Exec`; ensure wrapper writes `protocol-queue.json` |
+| Second-instance never fires (Linux) | Expected on some setups | Rely on queue file fallback; keep app running when redirecting |
+
+---
+
+## Step 7: Quick checklist
+
+1. **Registration:**  
+   `xdg-mime query default x-scheme-handler/unityagent` → `unityagent-handler.desktop`
+2. **Desktop entry:**  
+   `Exec=".../unityagent-handler.sh" %u`
+3. **Script executable:**  
+   `chmod +x scripts/unityagent-handler.sh`
+4. **App running** when you complete login in the browser.
+5. **Direct test:**  
+   With app running, `xdg-open 'unityagent://auth?token=test123&refreshToken=test456'` → app reacts.
+
+---
+
+## Related docs
+
+- **Login flow (desktop + frontend):** `LOGIN_FLOW.md`

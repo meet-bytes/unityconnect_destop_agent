@@ -16,7 +16,7 @@ const authService = require("./services/authService");
 const protocolQueue = require("./services/protocolQueue");
 const {
   SERVER_ENDPOINT,
-  buildLoginURL,
+  LOGIN_URL,
   PROTOCOL_SCHEME,
   APP_NAME,
   WINDOW_WIDTH,
@@ -561,7 +561,7 @@ app.whenReady().then(async () => {
   }
 
   // Validate token on startup (expired tokens are cleared by authService.readAuth)
-  authService.validateTokenOnStartup();
+  const validation = authService.validateTokenOnStartup();
 
   // Check if user is already logged in
   const isLoggedIn = authService.isLoggedIn();
@@ -677,9 +677,8 @@ ipcMain.handle("auth:login", async () => {
       authService.logout();
     }
     
-    const loginURL = buildLoginURL();
     const { shell } = require("electron");
-    await shell.openExternal(loginURL);
+    await shell.openExternal(LOGIN_URL);
     return { success: true };
   } catch (err) {
     console.error("Failed to open login URL:", err);
