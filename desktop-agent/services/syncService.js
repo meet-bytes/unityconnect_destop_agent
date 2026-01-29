@@ -1,7 +1,6 @@
 const fetch = require('node-fetch');
 const { getPending, replaceQueue, ensureStore } = require('./localStorage');
-
-const DEFAULT_INTERVAL_MS = 15000;
+const { SYNC_INTERVAL_MS, SYNC_QUEUE_DELAY_MS } = require('../config/appConfig');
 
 let endpoint = null;
 let syncTimer = null;
@@ -38,7 +37,7 @@ const syncPending = async () => {
   syncing = false;
 };
 
-const init = ({ endpoint: apiEndpoint, intervalMs = DEFAULT_INTERVAL_MS } = {}) => {
+const init = ({ endpoint: apiEndpoint, intervalMs = SYNC_INTERVAL_MS } = {}) => {
   endpoint = apiEndpoint;
   if (syncTimer) {
     clearInterval(syncTimer);
@@ -47,7 +46,7 @@ const init = ({ endpoint: apiEndpoint, intervalMs = DEFAULT_INTERVAL_MS } = {}) 
 };
 
 const queueSync = () => {
-  setTimeout(syncPending, 100);
+  setTimeout(syncPending, SYNC_QUEUE_DELAY_MS);
 };
 
 const stop = () => {

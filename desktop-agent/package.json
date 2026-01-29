@@ -21,8 +21,7 @@
     },
     "dependencies": {
         "auto-launch": "^5.0.6",
-        "node-fetch": "^2.7.0",
-        "ps-list": "^8.1.1"
+        "node-fetch": "^2.7.0"
     },
     "optionalDependencies": {
         "iohook": "^0.9.3"
@@ -36,6 +35,12 @@
     "build": {
         "appId": "com.unitycommunications.idleagent",
         "productName": "Unity Communications Agent",
+        "protocols": [
+            {
+                "name": "Unity Communications Agent",
+                "schemes": ["unityagent"]
+            }
+        ],
         "files": [
             "**/*",
             "!dist/**"
@@ -55,7 +60,15 @@
                 }
             ],
             "icon": "assets/app-logo.png",
-            "category": "public.app-category.productivity"
+            "category": "public.app-category.productivity",
+            "extendInfo": {
+                "CFBundleURLTypes": [
+                    {
+                        "CFBundleURLName": "com.unitycommunications.idleagent",
+                        "CFBundleURLSchemes": ["unityagent"]
+                    }
+                ]
+            }
         },
         "dmg": {
             "artifactName": "Unity-Communications-Agent-${version}-mac-${arch}.dmg"
@@ -75,7 +88,13 @@
                     ]
                 }
             ],
-            "icon": "assets/app-logo.png"
+            "icon": "assets/app-logo.png",
+            "protocols": [
+                {
+                    "name": "Unity Communications Agent",
+                    "schemes": ["unityagent"]
+                }
+            ]
         },
         "nsis": {
             "oneClick": false,

@@ -1,6 +1,6 @@
-const fs = require('fs');
-const path = require('path');
-const { app } = require('electron');
+const fs = require("fs");
+const path = require("path");
+const { app } = require("electron");
 
 let cachedPath = null;
 
@@ -8,14 +8,14 @@ const resolveStorePath = () => {
   if (cachedPath) return cachedPath;
   // In a packaged app the asar is read-only; store under userData.
   const baseDir =
-    (app && app.getPath ? app.getPath('userData') : null) ||
-    path.join(__dirname, '..', 'storage');
+    (app && app.getPath ? app.getPath("userData") : null) ||
+    path.join(__dirname, "..", "storage");
 
   if (!fs.existsSync(baseDir)) {
     fs.mkdirSync(baseDir, { recursive: true });
   }
 
-  cachedPath = path.join(baseDir, 'idleLogs.json');
+  cachedPath = path.join(baseDir, "idleLogs.json");
   return cachedPath;
 };
 
@@ -25,7 +25,7 @@ const ensureStore = () => {
     fs.writeFileSync(
       storePath,
       JSON.stringify({ queue: [], archive: [] }, null, 2),
-      'utf-8'
+      "utf-8",
     );
   }
 };
@@ -33,14 +33,14 @@ const ensureStore = () => {
 const readStore = () => {
   ensureStore();
   const storePath = resolveStorePath();
-  const raw = fs.readFileSync(storePath, 'utf-8');
+  const raw = fs.readFileSync(storePath, "utf-8");
   return JSON.parse(raw || '{"queue":[],"archive":[]}');
 };
 
 const writeStore = (data) => {
   ensureStore();
   const storePath = resolveStorePath();
-  fs.writeFileSync(storePath, JSON.stringify(data, null, 2), 'utf-8');
+  fs.writeFileSync(storePath, JSON.stringify(data, null, 2), "utf-8");
 };
 
 const appendLog = (log) => {
@@ -74,4 +74,3 @@ module.exports = {
   readStore,
   clearAll,
 };
-

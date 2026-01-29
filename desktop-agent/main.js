@@ -12,13 +12,19 @@ const AutoLaunch = require("auto-launch");
 const idleDetector = require("./services/idleDetector");
 const syncService = require("./services/syncService");
 const { ensureStore } = require("./services/localStorage");
+const authService = require("./services/authService");
+const protocolQueue = require("./services/protocolQueue");
 const {
+  SERVER_ENDPOINT,
+  buildLoginURL,
+  PROTOCOL_SCHEME,
+  APP_NAME,
+  WINDOW_WIDTH,
+  WINDOW_HEIGHT,
   IDLE_THRESHOLD_SECONDS,
   WARNING_COUNTDOWN_SECONDS,
-} = require("./config/idleTiming");
-
-const SERVER_ENDPOINT =
-  "https://unity-communication.bytestechnolab.net/api/idle-logs";
+  SYNC_INTERVAL_MS,
+} = require("./config/appConfig");
 
 let mainWindow;
 let tray;
@@ -38,7 +44,7 @@ const trayIconPaths = {
 
 // Auto-launch configuration (starts app on login)
 const autoLauncher = new AutoLaunch({
-  name: "Unity Communications Agent",
+  name: APP_NAME,
   path: app.getPath("exe"),
   isHidden: true, // Start minimized to tray
 });
@@ -75,13 +81,15 @@ function updateTrayIcon() {
   if (!img.isEmpty()) {
     tray.setImage(img);
   }
-  tray.setToolTip(`Unity Communications Agent • ${getTrayStatusLabel()}`);
+  tray.setToolTip(`${APP_NAME} • ${getTrayStatusLabel()}`);
 }
 
 function createTray() {
   let img = nativeImage.createFromPath(trayIconPaths.stopped);
   if (img.isEmpty()) {
-    img = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+    img = nativeImage
+      .createFromPath(iconPath)
+      .resize({ width: 16, height: 16 });
   }
   tray = new Tray(img);
 
@@ -101,12 +109,11 @@ function createTray() {
       label: "Status",
       sublabel: "Check agent status",
       click: () => {
-        const status = idleDetector.getStatus();
-        const state = status.running ? "Running" : "Stopped";
-        console.log(`Agent status: ${state}`);
         if (mainWindow) {
           mainWindow.show();
           mainWindow.focus();
+        } else {
+          createWindow(true);
         }
       },
     },
@@ -131,17 +138,27 @@ function createTray() {
       createWindow();
     }
   });
-};
+}
 
-const createWindow = () => {
+const createWindow = (showWindow = true) => {
+  // Prevent duplicate windows
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (showWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    return mainWindow;
+  }
+
   const icon = nativeImage.createFromPath(iconPath);
 
   mainWindow = new BrowserWindow({
-    width: 620,
-    height: 820,
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT,
     resizable: false,
-    title: "Unity Communications",
+    title: APP_NAME,
     icon,
+    show: showWindow, // Control visibility
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -163,6 +180,13 @@ const createWindow = () => {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+
+  // If window should be hidden, hide it after load
+  if (!showWindow) {
+    mainWindow.once("ready-to-show", () => {
+      mainWindow.hide();
+    });
+  }
 };
 
 const ensureOverlayWindow = () => {
@@ -322,9 +346,181 @@ ipcMain.on("overlay:ready", (event) => {
   }
 });
 
+// Extract protocol URL from argv/commandLine array
+const getProtocolURLFromArgs = (args) => {
+  const prefix = `${PROTOCOL_SCHEME}://`;
+  for (let i = 0; i < (args || []).length; i++) {
+    const arg = args[i];
+    if (arg && typeof arg === "string" && arg.startsWith(prefix)) return arg;
+    if (arg && typeof arg === "string" && (arg.includes(PROTOCOL_SCHEME) || arg.includes("token="))) {
+      const m = arg.match(/unityagent:\/\/[^\s"']+/);
+      if (m) return m[0];
+    }
+  }
+  return null;
+};
+
+// Handle custom protocol (unityagent://)
+const handleProtocolURL = (url) => {
+  try {
+    const authData = authService.parseTokenFromURL(url, PROTOCOL_SCHEME);
+    if (!authData || !authData.token) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("auth:error", {
+          message: "Invalid authentication URL. No token found.",
+        });
+        mainWindow.show();
+        mainWindow.focus();
+      }
+      return;
+    }
+
+    authService.setToken(
+      authData.token,
+      authData.refreshToken || null,
+      authData.userInfo || null,
+    );
+
+    // Ensure window exists and is visible
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createWindow(true);
+    } else {
+      // Force show and focus window when receiving auth callback
+      mainWindow.show();
+      mainWindow.focus();
+      // Bring to front (works on Linux)
+      if (mainWindow.setAlwaysOnTop) {
+        mainWindow.setAlwaysOnTop(true);
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setAlwaysOnTop(false);
+          }
+        }, 100);
+      }
+    }
+    
+    // Send auth success event to renderer
+    const sendAuthSuccess = () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.webContents.isLoading()) {
+          mainWindow.webContents.once("did-finish-load", () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              setTimeout(() => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send("auth:success", {
+                    token: authData.token,
+                    userInfo: authData.userInfo,
+                  });
+                }
+              }, 100);
+            }
+          });
+        } else {
+          setTimeout(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send("auth:success", {
+                token: authData.token,
+                userInfo: authData.userInfo,
+              });
+            }
+          }, 100);
+        }
+      }
+    };
+    
+    // Wait a bit for window to be ready if just created
+    setTimeout(sendAuthSuccess, mainWindow && !mainWindow.isDestroyed() ? 100 : 500);
+  } catch (err) {
+    console.error("Error handling protocol URL:", err);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("auth:error", {
+        message: "Failed to process authentication. Please try again.",
+      });
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }
+};
+
+// Handle protocol URL on Windows/Linux (when app is launched via protocol)
+// This must be done BEFORE app.whenReady()
+if (process.platform === "win32" || process.platform === "linux") {
+  const gotTheLock = app.requestSingleInstanceLock();
+
+  if (!gotTheLock) {
+    app.quit();
+    process.exit(0);
+  } else {
+    app.on("second-instance", (_event, commandLine) => {
+      // Always show window when second-instance fires
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        createWindow(true);
+      } else {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      }
+      
+      const protocolURL = getProtocolURLFromArgs(commandLine);
+      if (!protocolURL) {
+        // Bring window to front even without protocol URL
+        if (mainWindow && !mainWindow.isDestroyed() && mainWindow.setAlwaysOnTop) {
+          mainWindow.setAlwaysOnTop(true);
+          setTimeout(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.setAlwaysOnTop(false);
+            }
+          }, 100);
+        }
+        return;
+      }
+      
+      // Bring to front when protocol URL is present
+      if (mainWindow && !mainWindow.isDestroyed() && mainWindow.setAlwaysOnTop) {
+        mainWindow.setAlwaysOnTop(true);
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setAlwaysOnTop(false);
+          }
+        }, 100);
+      }
+      
+      setTimeout(() => handleProtocolURL(protocolURL), mainWindow && !mainWindow.isDestroyed() ? 200 : 500);
+    });
+  }
+}
+
+// Register protocol handler
+// Note: In development, protocol registration often fails because the app isn't installed
+// You need to manually register it using the register-protocol.sh script
+if (process.defaultApp && process.argv.length >= 2) {
+  try {
+    app.setAsDefaultProtocolClient(PROTOCOL_SCHEME, process.execPath, [
+      path.resolve(process.argv[1]),
+    ]);
+  } catch (err) {
+    console.error("[protocol] Registration failed (dev):", err.message);
+  }
+} else {
+  try {
+    app.setAsDefaultProtocolClient(PROTOCOL_SCHEME);
+  } catch (err) {
+    console.error("[protocol] Registration failed:", err);
+  }
+}
+
+// Handle protocol URL when app is already running (macOS)
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  handleProtocolURL(url);
+});
+
 app.whenReady().then(async () => {
   ensureStore();
-  syncService.init({ endpoint: SERVER_ENDPOINT });
+  syncService.init({ 
+    endpoint: SERVER_ENDPOINT,
+    intervalMs: SYNC_INTERVAL_MS,
+  });
 
   // Set dock icon on macOS
   if (process.platform === "darwin" && iconPath) {
@@ -335,15 +531,86 @@ app.whenReady().then(async () => {
   // Create tray first (so it's always visible)
   createTray();
 
-  // Create main window
-  createWindow();
+  // Poll protocol queue file as fallback (in case second-instance doesn't fire)
+  let isProcessingQueue = false;
+  const checkProtocolQueue = () => {
+    if (isProcessingQueue) return;
+    const queuedURL = protocolQueue.dequeueProtocolURL();
+    if (queuedURL) {
+      isProcessingQueue = true;
+      // Ensure window is visible
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        createWindow(true);
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+      setTimeout(() => {
+        handleProtocolURL(queuedURL);
+        setTimeout(() => { isProcessingQueue = false; }, 1000);
+      }, 300);
+    }
+  };
+  setInterval(checkProtocolQueue, 500);
+  checkProtocolQueue();
+
+  // Handle protocol URL if app was launched via protocol (first launch)
+  let protocolURL = getProtocolURLFromArgs(process.argv);
+  if (!protocolURL && process.env.ELECTRON_PROTOCOL_URL) {
+    protocolURL = process.env.ELECTRON_PROTOCOL_URL;
+  }
+
+  // Validate token on startup (expired tokens are cleared by authService.readAuth)
+  authService.validateTokenOnStartup();
+
+  // Check if user is already logged in
+  const isLoggedIn = authService.isLoggedIn();
+
+  // Create main window: show if protocol URL exists (we're logging in) or if not logged in
+  const shouldShowWindow = !isLoggedIn || !!protocolURL;
+  createWindow(shouldShowWindow);
+
+  // Handle protocol URL if present (first launch scenario)
+  if (protocolURL) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+      if (mainWindow.setAlwaysOnTop) {
+        mainWindow.setAlwaysOnTop(true);
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setAlwaysOnTop(false);
+          }
+        }, 200);
+      }
+    }
+    setTimeout(() => handleProtocolURL(protocolURL), 500);
+  }
 
   // Enable auto-launch on login
   await enableAutoLaunch();
 
+  // If already logged in, notify renderer and keep window hidden (starts in tray)
+  if (isLoggedIn && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.once("did-finish-load", () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("auth:status", { loggedIn: true });
+      }
+    });
+  }
+
+  // If token was expired and cleared, notify renderer when it loads
+  if (!validation.valid && validation.reason === "expired" && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.once("did-finish-load", () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("auth:tokenExpired", { message: "Session expired. Please log in again." });
+      }
+    });
+  }
+
   app.on("activate", () => {
     if (!mainWindow) {
-      createWindow();
+      createWindow(true);
       return;
     }
     mainWindow.show();
@@ -351,6 +618,12 @@ app.whenReady().then(async () => {
 });
 
 ipcMain.handle("agent:start", async (_event, payload = {}) => {
+  // Check authentication first (token expiry is validated in authService.isLoggedIn)
+  const isLoggedIn = authService.isLoggedIn();
+  if (!isLoggedIn) {
+    throw new Error("Please log in first to start the agent.");
+  }
+
   const { userName } = payload;
   if (!userName || !userName.trim()) {
     throw new Error("User name is required to start the agent.");
@@ -384,6 +657,51 @@ ipcMain.handle("agent:clearLogs", async () => {
   const storage = require("./services/localStorage");
   storage.clearAll();
   return { ok: true };
+});
+
+// Authentication IPC handlers
+ipcMain.handle("auth:status", async () => {
+  return {
+    loggedIn: authService.isLoggedIn(),
+    token: authService.getToken(),
+    refreshToken: authService.getRefreshToken(),
+    userInfo: authService.getUserInfo(),
+  };
+});
+
+ipcMain.handle("auth:login", async () => {
+  try {
+    // Validate token not expired before opening browser (optional; expiry handled on startup)
+    const isLoggedIn = authService.isLoggedIn();
+    if (!isLoggedIn && authService.getToken()) {
+      authService.logout();
+    }
+    
+    const loginURL = buildLoginURL();
+    const { shell } = require("electron");
+    await shell.openExternal(loginURL);
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to open login URL:", err);
+    const msg = err.message || "";
+    if (msg.includes("ENOENT") || msg.includes("open") || msg.includes("browser")) {
+      throw new Error("Could not open browser. Check your default browser or try again.");
+    }
+    if (msg.includes("network") || msg.includes("ECONNREFUSED") || msg.includes("ETIMEDOUT")) {
+      throw new Error("Network offline or unreachable. Check your connection and try again.");
+    }
+    throw new Error("Failed to open login page. Please try again.");
+  }
+});
+
+ipcMain.handle("auth:logout", async () => {
+  authService.logout();
+  // Stop agent if running
+  idleDetector.stop();
+  hideOverlay();
+  broadcastStatus();
+  updateTrayIcon();
+  return { success: true };
 });
 
 app.on("before-quit", () => {

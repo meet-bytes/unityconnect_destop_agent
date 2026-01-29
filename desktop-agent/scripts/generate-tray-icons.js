@@ -25,7 +25,7 @@ const STATUS = {
 function svgCircle(size, color) {
   const r = size / 2;
   return Buffer.from(
-    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg"><circle cx="${r}" cy="${r}" r="${r}" fill="${color}"/></svg>`
+    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg"><circle cx="${r}" cy="${r}" r="${r}" fill="${color}"/></svg>`,
   );
 }
 
@@ -49,7 +49,6 @@ async function generate() {
       ])
       .png()
       .toFile(outPath);
-    console.log("Generated", outPath);
   }
 }
 

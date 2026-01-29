@@ -2,8 +2,8 @@ const { powerMonitor } = require('electron');
 const localStorage = require('./localStorage');
 const syncService = require('./syncService');
 
-const { IDLE_THRESHOLD_SECONDS } = require('../config/idleTiming');
-const POLL_INTERVAL_MS = 1000;
+const { IDLE_THRESHOLD_SECONDS, IDLE_POLL_INTERVAL_MS } = require('../config/appConfig');
+const POLL_INTERVAL_MS = IDLE_POLL_INTERVAL_MS;
 
 let pollHandle = null;
 let idleStart = null;
@@ -27,27 +27,15 @@ const checkIdle = () => {
     return;
   }
 
-  // Debug: Log first few checks and when idle time changes significantly
   if (idleDetectionWorking === null) {
-    console.log(`[IdleDetector] Platform: ${process.platform}`);
-    console.log(`[IdleDetector] Initial idle time: ${idleSeconds}s`);
     idleDetectionWorking = idleSeconds > 0 || process.platform !== 'linux';
-    
     if (!idleDetectionWorking && process.platform === 'linux') {
-      console.warn('[IdleDetector] WARNING: Idle time is 0 on Linux.');
-      console.warn('[IdleDetector] This may indicate missing libxss1 or running under Wayland.');
-      console.warn('[IdleDetector] Install: sudo apt install libxss1');
-      console.warn('[IdleDetector] Or switch to X11 session (Ubuntu on Xorg)');
+      console.warn('[IdleDetector] Idle time 0 on Linux. Install libxss1 or use X11: sudo apt install libxss1');
     }
   }
-
-  // Track last non-zero idle time for debugging
   if (idleSeconds > 0) {
     lastNonZeroIdleTime = idleSeconds;
-    if (idleDetectionWorking === false) {
-      idleDetectionWorking = true;
-      console.log('[IdleDetector] Idle detection now working!');
-    }
+    if (idleDetectionWorking === false) idleDetectionWorking = true;
   }
 
   const now = Date.now();
@@ -62,10 +50,8 @@ const checkIdle = () => {
     });
   }
 
-  // Track state change for UI indicator
   if (isIdle !== currentlyIdle) {
     currentlyIdle = isIdle;
-    console.log(`[IdleDetector] State changed: ${isIdle ? 'IDLE' : 'ACTIVE'} (idle: ${idleSeconds}s)`);
     if (onStateChangeCallback) {
       onStateChangeCallback({ isIdle: currentlyIdle, idleSeconds });
     }
@@ -73,7 +59,6 @@ const checkIdle = () => {
 
   if (isIdle && !idleStart) {
     idleStart = new Date(now - idleSeconds * 1000);
-    console.log(`[IdleDetector] Idle period started at ${idleStart.toISOString()}`);
   }
 
   if (!isIdle && idleStart) {
@@ -82,9 +67,6 @@ const checkIdle = () => {
       1,
       Math.round((idleEnd.getTime() - idleStart.getTime()) / 1000)
     );
-
-    console.log(`[IdleDetector] Idle period ended. Duration: ${durationInSeconds}s`);
-
     localStorage.appendLog({
       userName: activeUser,
       idleStart: idleStart.toISOString(),
@@ -120,8 +102,7 @@ const stop = () => {
   }
   idleStart = null;
   currentlyIdle = false;
-  idleDetectionWorking = null; // Reset for next start
-  console.log('[IdleDetector] Stopped');
+  idleDetectionWorking = null;
 };
 
 const getStatus = () => ({
