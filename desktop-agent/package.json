@@ -59,7 +59,7 @@
                     ]
                 }
             ],
-            "icon": "assets/app-logo.png",
+            "icon": "assets/app_icon.png",
             "category": "public.app-category.productivity",
             "extendInfo": {
                 "CFBundleURLTypes": [
@@ -88,7 +88,7 @@
                     ]
                 }
             ],
-            "icon": "assets/app-logo.png",
+            "icon": "assets/app_icon.png",
             "protocols": [
                 {
                     "name": "Unity Communications Agent",
@@ -120,7 +120,7 @@
                     ]
                 }
             ],
-            "icon": "assets/app-logo.png",
+            "icon": "assets/app_icon.png",
             "category": "Utility",
             "maintainer": "Bytes Technolab <meet.soni@bytestechnolab.com>",
             "artifactName": "Unity-Communications-Agent-${version}.${ext}"

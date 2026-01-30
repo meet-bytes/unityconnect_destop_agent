@@ -6,8 +6,13 @@
 const SERVER_ENDPOINT =
   "https://unity-communication.bytestechnolab.net/api/idle-logs";
 // Login page opened by desktop agent; frontend uses redirect_uri=unityagent to redirect back
-const LOGIN_URL =
-  "http://192.168.10.20:3000/login?redirect_uri=unityagent";
+
+// Development:
+const LOGIN_URL = "http://localhost:9071/login?redirect_uri=unityagent";
+
+// Production (update with your production frontend URL):
+// const LOGIN_URL =
+// "https://frontend-unity-communications.bytestechnolab.net/login?redirect_uri=unityagent";
 
 // Protocol Configuration
 const PROTOCOL_SCHEME = "unityagent";

@@ -123,7 +123,7 @@ Bytes Technolab
 
 **Attachments:**
 
-* Installation Guide (INSTALLATION_GUIDE.md)
+* Installation guide (see README.md)
 * Platform-specific installers
 
 
