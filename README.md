@@ -150,6 +150,8 @@ Installers are created in **`desktop-agent/dist/`**:
 - **Windows:** `Unity-Communications-Agent-Setup-0.1.0.exe`
 - **Linux:** `Unity-Communications-Agent-0.1.0.deb`, `Unity-Communications-Agent-0.1.0.AppImage`
 
+To build only Linux: `npm run dist:linux`. For a single format: `npm run dist:linux:appimage` or `npm run dist:linux:deb`. If the build fails with `ERR_ELECTRON_BUILDER_CANNOT_EXECUTE`, run it in a normal terminal (outside the IDE); some environments kill the builder subprocess.
+
 Put the right file(s) on your download page and point users to that URL. Example wording: *“Download the desktop agent for [Windows / Mac / Linux] from [link].”*
 
 ---

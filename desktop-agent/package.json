@@ -17,6 +17,8 @@
         "dist:mac": "electron-builder --mac",
         "dist:win": "electron-builder --win",
         "dist:linux": "electron-builder --linux",
+        "dist:linux:appimage": "electron-builder --linux AppImage",
+        "dist:linux:deb": "electron-builder --linux deb",
         "dist:all": "electron-builder --mac --win --linux"
     },
     "dependencies": {
